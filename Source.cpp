@@ -235,7 +235,8 @@ SDL_Texture* CreateTextureFromText(SDL_Renderer* render, const char* str, TTF_Fo
 
 void CreateTextureFromSector(SDL_Renderer* render, Sector* sector, TTF_Font* font, SDL_Color fg) {
 	SDL_Surface* surface = TTF_RenderUTF8_Blended(font, sector->str, fg);
-	sector->rect = surface->clip_rect;
+	sector->rect.w = surface->w;
+	sector->rect.h = surface->h;
 	sector->texture = SDL_CreateTextureFromSurface(render, surface);
 	SDL_FreeSurface(surface);
 }
@@ -283,10 +284,12 @@ size_t curlWriteFunc(char* data, size_t size, size_t nmemb, std::string* buffer)
 	return result;
 }
 
-bool request(int &count, char* uk[]) {
-	std::string curlBuffer;
+std::string curlBuffer;
+
+bool request( std::string* buffer) {
+	
 	//SetConsoleOutputCP(CP_UTF8);
-	std::string find = u8"Название книги";
+	
 	// запрашиваемая страничка(путь до login screen)
 	const char* url = R"(https://api.notion.com/v1/databases/65c17b98615f4ffb85f3b0b366950b92/query)";
 	// передаваемые параметры
@@ -320,7 +323,7 @@ bool request(int &count, char* uk[]) {
 		//параметры Headers
 		curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list);
 		// функция, вызываемая cURL для записи полученых данных
-		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &curlBuffer);
+		curl_easy_setopt(curl, CURLOPT_WRITEDATA, buffer);
 		curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curlWriteFunc);
 
 		// выполнить запрос
@@ -330,40 +333,34 @@ bool request(int &count, char* uk[]) {
 
 		if (curlResult == CURLE_OK)
 		{
-			//free(uk);
-			//uk = (char**)malloc(sizeof(char*) * 50);
-			count = 0;
-			std::string find_content = "content";
-			std::size_t pos_init = 0;
-			int len = find_content.length() + 3;
-			std::size_t found = curlBuffer.find(find, pos_init);
-			while (found != std::string::npos) {
-				found = curlBuffer.find(find_content, found);
-				pos_init = found + len;
-				found = curlBuffer.find('"', pos_init);
-				int counts = found - pos_init;
-				//curlBuffer.substr(pos_init, counts).data()
-				std::string copy_string = curlBuffer.substr(pos_init, counts);
-				strcpy_s(uk[count],200, copy_string.data());
-				//uk[count] = (char*) curlBuffer.substr(pos_init, count).data();
-				pos_init = found;
-				found = curlBuffer.find(find, pos_init);
-				printf("next %s\n", uk[count]);
-				if(count>0)
-					printf("prew %s\n", uk[count-1]);
-				count++;
-				
-			}
-			std::cout << curlBuffer << std::endl;
 			return true;
 		}
 		else {
 			std::cout << "Ошибка(" << curlResult << "): " << curlErrorBuffer << std::endl;	
 			return false;
 		}
-
 	}
 	return false;
+}
+void CopyBuffer(std::string buffer, Sector* items, int &count) {
+	std::string find = u8"Название книги";	
+	std::string find_content = "content";
+	count = 0;
+	std::size_t pos_init = 0;
+	int len = find_content.length() + 3;
+	std::size_t found = buffer.find(find, pos_init);
+	while (found != std::string::npos) {
+		found = buffer.find(find_content, found);
+		pos_init = found + len;
+		found = buffer.find('"', pos_init);
+		int counts = found - pos_init;
+		//curlBuffer.substr(pos_init, counts).data()
+		std::string copy_string = buffer.substr(pos_init, counts);
+		strcpy_s(items[count].str, copy_string.data());
+		pos_init = found;
+		found = buffer.find(find, pos_init);
+		count++;
+	}
 }
 
 int main(int argc, char* argv[])
@@ -546,16 +543,15 @@ int main(int argc, char* argv[])
 		}
 		
 		if (res) {
-			if (request(inCURL, req)) {
-				for (int i = 0; i < inCURL; i++) {
-					//items[i].str = "";
-					strcpy_s(items[i].str, req[i]);
+			if (request(&curlBuffer)) {
+				CopyBuffer(curlBuffer, items, inCURL);
+				for (int i = 0; i < sectorCirc; i++) {
 					UpdateTexturText(ren, &items[i], font, fg_str);
 				}
 				sectorCirc = inCURL;
 				isDrawTexture = true;
-			}
-			
+				curlBuffer = "";
+			}			
 			res = false;
 		}
 
