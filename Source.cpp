@@ -3,6 +3,11 @@
 #include<SDL_ttf.h>
 #include <SDL2_gfxPrimitives.h>
 #include<iostream>
+#include<string.h>
+
+#include <string>
+#include <curl/curl.h>
+
 
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
@@ -10,15 +15,15 @@
 
 
 const int SCREEN_WIDTH = 1000;
-const int SCREEN_HEIGTH = 1000;
+const int SCREEN_HEIGTH = 700;
 
-const int maxSectors = 22;
+const int maxSectors = 25;
 
 const float radius = 400; //Радиус пирога
 int sectorCirc = maxSectors; //Количество секторов
 double speed = 50; //"Угловая" скорость
 
-const char* Name_List[50] = { "Welcum to hell!", "Item 2", "Item 3", u8"Пошёл нахер, козёл!", u8"Гнида", u8"Петух", u8"The FUCK!!!", u8"УМРУ, НО НЕ СДАМСЯ!", "Item 9", "Item 10","Item 11", "Item 12","Item 13", "Item 14" ,"Item 15", "Item 16" ,"Item 17", "Item 18" ,"Item 19", "Item 20", "Item 21", "Item 22", "Item 23","Item 11", "Item 12","Item 13", "Item 14" ,"Item 15", "Item 16" ,"Item 17", "Item 18" };
+const char* Name_List[50] = { "Welcum to hell!", "Item 2", "Item 3", u8"Пошёл нахер, козёл!", u8"Гнида", u8"Петух", u8"The FUCK!!!", u8"УМРУ, НО НЕ СДАМСЯ!", "Item 9", "Item 10","Item 11", "Item 12","Item 13", "Item 14" ,"Item 15", "Item 16" ,"Item 17", "Item 18" ,"Item 19", "Item 20", "Item 21", "Item 22", "Item 23","Item 24", "Item 25","Item 26", "Item 27" ,"Item 28", "Item 29" ,"Item 30", "Item 31" };
 
 
 SDL_Color BackGround;
@@ -28,6 +33,15 @@ SDL_Renderer* ren = NULL;
 
 int win_width = SCREEN_WIDTH, win_heigth = SCREEN_HEIGTH;
 
+
+//Дополнительные элементы для работы программы
+struct Sector {
+	int sector;
+	char str[100];
+	SDL_Rect rect;
+	SDL_Color color;
+	SDL_Texture* texture;
+};
 
 //функции инициализации и деинициализации приложения
 void DeInit(int error)
@@ -127,6 +141,24 @@ void DrawPie(SDL_Renderer* render, int radius, int sector, SDL_Color* color, int
 	}
 	DrawCircle(render, 70, radius, center, 3);
 }
+void DrawPieFromSector(SDL_Renderer* render, Sector* items, int count, int radius, SDL_Point center) {
+	double lengSector = 360.0 / count;
+	for (int i = 0; i < count; i++) {
+		filledPieRGBA(render, center.x, center.y, radius, lengSector * i, lengSector * (i + 1), items[i].color.r, items[i].color.g, items[i].color.b, items[i].color.a);
+	}
+	for (int i = 0; i < count; i++) {
+		int sx, sy;
+
+		double x = radius * cos(((lengSector * (i))) * (M_PI / 180) * (-1));
+		double y = radius * sin(((lengSector * (i))) * (M_PI / 180) * (-1));
+		mathCordsToScrean(x, y, 1.0, center.x, center.y, sx, sy);
+		//SDL_RenderDrawLine(ren, center.x, center.y, sx, sy);
+
+		//thickLineRGBA(render, center.x, center.y, sx, sy, 3, 0, 0, 0, 255);
+		thickLineRGBA(render, center.x, center.y, center.x + x, center.y - y, 3, 0, 0, 0, 255);
+	}
+	DrawCircle(render, 70, radius, center, 3);
+}
 //Основная текстура
 SDL_Texture* CreatePieTexture(SDL_Renderer* render, int radius, int sector, SDL_Color* color, int countColor, SDL_Color bg) {
 	int delta = 0;
@@ -148,7 +180,47 @@ SDL_Texture* CreatePieTexture(SDL_Renderer* render, int radius, int sector, SDL_
 
 	return textur;
 }
+void UpdatePieTexture(SDL_Renderer* render, SDL_Texture* texture, int radius, int sector, SDL_Color* color, int countColor, SDL_Color bg) {
+	
+	SDL_SetRenderTarget(render, texture);
+	//Заливаем фон
+	SDL_SetRenderDrawColor(render, bg.r, bg.g, bg.b, bg.a); //Серый цвет
+	SDL_RenderClear(render);
+
+	DrawPie(render, radius, sector, color, countColor, { radius, radius});
+
+	SDL_SetRenderTarget(render, NULL);
+}
+void UpdatePieTextureFromSector(SDL_Renderer* render, SDL_Texture* texture, int radius,  Sector* items, int count, SDL_Color bg) {
+	SDL_SetRenderTarget(render, texture);
+	//Заливаем фон
+	SDL_SetRenderDrawColor(render, bg.r, bg.g, bg.b, bg.a);
+	SDL_RenderClear(render);
+
+	DrawPieFromSector(render, items, count, radius, { radius, radius });
+
+	SDL_SetRenderTarget(render, NULL);
+}
 //------------------------------------------------
+SDL_Texture* CreatePieTextureFromSector(SDL_Renderer* render, Sector* items, int count, int radius, SDL_Color bg) {
+	SDL_Texture* textur = SDL_CreateTexture(render, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, radius * 2, radius * 2);
+	if (textur == NULL) {
+		printf("Couldn`t create texture! Error: %s", SDL_GetError());
+		system("pause");
+		DeInit(1);
+	}
+	SDL_SetRenderTarget(render, textur);
+
+	//Заливаем фон
+	SDL_SetRenderDrawColor(render, bg.r, bg.g, bg.b, bg.a); //Серый цвет
+	SDL_RenderClear(render);
+	DrawPieFromSector(render,items,count,radius, { radius , radius });
+
+	SDL_SetRenderTarget(render, NULL);
+
+	return textur;
+}
+
 
 //Функция создания текстуры текста
 SDL_Texture* CreateTextureFromText(SDL_Renderer* render, const char* str, TTF_Font* font, SDL_Rect* rect, SDL_Color fg) {
@@ -161,11 +233,165 @@ SDL_Texture* CreateTextureFromText(SDL_Renderer* render, const char* str, TTF_Fo
 	return textur;
 }
 
+void CreateTextureFromSector(SDL_Renderer* render, Sector* sector, TTF_Font* font, SDL_Color fg) {
+	SDL_Surface* surface = TTF_RenderUTF8_Blended(font, sector->str, fg);
+	sector->rect = surface->clip_rect;
+	sector->texture = SDL_CreateTextureFromSurface(render, surface);
+	SDL_FreeSurface(surface);
+}
+void UpdateTexturText(SDL_Renderer* render, Sector* sector, TTF_Font* font, SDL_Color fg) {
+	SDL_DestroyTexture(sector->texture);
+	if (sector->str == u8"") {
+		return;
+	}
+	SDL_Surface* surface = TTF_RenderUTF8_Blended(font, sector->str, fg);
+	if (surface == NULL) {
+		return;
+	}
+	sector->rect.w = surface->w;
+	sector->rect.h = surface->h;
+	sector->texture = SDL_CreateTextureFromSurface(render, surface);
+	SDL_FreeSurface(surface);
+}
+
+//Фунцкии работы imGui
+bool ColorEdit3U32(const char* label, SDL_Color& color, ImGuiColorEditFlags flags = 0) {
+	float col[4];
+	col[0] = (float)((color.r) & 0xFF) / 255.0f;
+	col[1] = (float)((color.g) & 0xFF) / 255.0f;
+	col[2] = (float)((color.b) & 0xFF) / 255.0f;
+	col[3] = (float)((color.a) & 0xFF) / 255.0f;
+
+	bool result = ImGui::ColorEdit3(label, col, flags);
+
+	color = { (Uint8)(col[0] * 255), (Uint8)(col[1] * 255), (Uint8)(col[2] * 255), (Uint8)(col[3] * 255) };
+
+	return result;
+}
+
+//cURL
+
+size_t curlWriteFunc(char* data, size_t size, size_t nmemb, std::string* buffer)
+{
+	size_t result = 0;
+
+	if (buffer != NULL)
+	{
+		buffer->append(data, size * nmemb);
+		result = size * nmemb;
+	}
+	return result;
+}
+
+bool request(int &count, char* uk[]) {
+	std::string curlBuffer;
+	//SetConsoleOutputCP(CP_UTF8);
+	std::string find = u8"Название книги";
+	// запрашиваемая страничка(путь до login screen)
+	const char* url = R"(https://api.notion.com/v1/databases/65c17b98615f4ffb85f3b0b366950b92/query)";
+	// передаваемые параметры
+	const char* urlPOST = u8R"({"filter": {"and": [{"property": "Сезон", "select" : {"equals": "2 сезон"}}, {"property": "Status", "status": {"equals": "В предложке"}}] }})";
+
+	//Передаваемый headers
+	struct curl_slist* list = NULL;
+	// буфер для сохранения текстовых ошибок
+	char curlErrorBuffer[CURL_ERROR_SIZE];
+
+	CURL* curl = curl_easy_init();
+	if (curl) {
+		//
+		curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, curlErrorBuffer);
+
+		list = curl_slist_append(list, "Authorization: Bearer secret_fn3KKxMMz6vShXrPMj4MESqj9C4ApSEJ0Bbbc3CxQho");
+		list = curl_slist_append(list, "Notion-Version: 2022-06-28");
+		list = curl_slist_append(list, "content-type: application/json");
+		list = curl_slist_append(list, "accept: application/json");
+
+		// задаем URL...
+		curl_easy_setopt(curl, CURLOPT_URL, url);
+		// переходить по "Location:" указаному в HTTP заголовке  
+		curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1);
+		// не проверять сертификат удаленного сервера
+		curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0);
+		// использовать метод POST для отправки данных
+		curl_easy_setopt(curl, CURLOPT_POST, 1);
+		// параметры POST
+		curl_easy_setopt(curl, CURLOPT_POSTFIELDS, urlPOST);
+		//параметры Headers
+		curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list);
+		// функция, вызываемая cURL для записи полученых данных
+		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &curlBuffer);
+		curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curlWriteFunc);
+
+		// выполнить запрос
+		CURLcode curlResult = curl_easy_perform(curl);
+		// завершение сеанса
+		curl_easy_cleanup(curl);
+
+		if (curlResult == CURLE_OK)
+		{
+			//free(uk);
+			//uk = (char**)malloc(sizeof(char*) * 50);
+			count = 0;
+			std::string find_content = "content";
+			std::size_t pos_init = 0;
+			int len = find_content.length() + 3;
+			std::size_t found = curlBuffer.find(find, pos_init);
+			while (found != std::string::npos) {
+				found = curlBuffer.find(find_content, found);
+				pos_init = found + len;
+				found = curlBuffer.find('"', pos_init);
+				int counts = found - pos_init;
+				//curlBuffer.substr(pos_init, counts).data()
+				std::string copy_string = curlBuffer.substr(pos_init, counts);
+				strcpy_s(uk[count],200, copy_string.data());
+				//uk[count] = (char*) curlBuffer.substr(pos_init, count).data();
+				pos_init = found;
+				found = curlBuffer.find(find, pos_init);
+				printf("next %s\n", uk[count]);
+				if(count>0)
+					printf("prew %s\n", uk[count-1]);
+				count++;
+				
+			}
+			std::cout << curlBuffer << std::endl;
+			return true;
+		}
+		else {
+			std::cout << "Ошибка(" << curlResult << "): " << curlErrorBuffer << std::endl;	
+			return false;
+		}
+
+	}
+	return false;
+}
+
 int main(int argc, char* argv[])
 {
 	//Инициализция приложения
 	Init();
 	SDL_Event ev;
+
+	#pragma region Initialization ImGui
+	// Setup Dear ImGui context
+	IMGUI_CHECKVERSION(); //Что делает?
+	ImGui::CreateContext();
+	ImGuiIO& io = ImGui::GetIO(); (void)io;
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+
+	// Setup Dear ImGui style
+	ImGui::StyleColorsDark();
+
+	// Setup Platform/Renderer backends
+	ImGui_ImplSDL2_InitForSDLRenderer(win, ren);
+	ImGui_ImplSDLRenderer2_Init(ren);
+
+	io.Fonts->Clear();//Переписать адрес шрифта
+	ImFont* fontForGui = io.Fonts->AddFontFromFileTTF("F:\\ProgramProject\\Roller Fortune\\Debug\\fonts\\Candara.ttf", 18.0f, nullptr, io.Fonts->GetGlyphRangesCyrillic());
+	IM_ASSERT(fontForGui != nullptr);
+	#pragma endregion
+
 
 	//Назначаем цвет фона
 	BackGround = { 200, 200, 200,255 };
@@ -198,29 +424,54 @@ int main(int argc, char* argv[])
 		{105,105,105,255}
 	};
 
+	SDL_Color fg_str = { 120,20,20,255 };
+
 	//Информация для пирога
 	double lengSector = 360.0 / sectorCirc;
 	double sectorCenter = lengSector / 2;
 
-	bool isDrawTexture = true; //Для перерисовки текстуры
+	bool isDrawTexture = false; //Для перерисовки текстуры
 
 	double dspeed = 0; //Изменение скорости
 
+	int inCURL = 0;
+	bool res = false;
+	char** req = (char**)malloc(sizeof(char*)*50);
+	for (int i = 0; i < 50; i++) {
+		char a[200] = "";
+		req[i] = (char*)a;
+	}
 	//Создание основной текстуры
 	SDL_Texture* textur = NULL;
 	SDL_Point center = { win_width / 2,win_heigth / 2 };
 
-	//создание текстовых текстур секторов
-	SDL_Texture** item_str_text = (SDL_Texture**)malloc(sizeof(SDL_Texture*) * sectorCirc);
-	SDL_Rect* item_dstrect = (SDL_Rect*)malloc(sizeof(SDL_Rect) * sectorCirc);
-	//Создание текстуры текста
-	for (int i = 0; i < sectorCirc; i++) {
-		item_str_text[i] = CreateTextureFromText(ren, Name_List[i], font, &item_dstrect[i], { 120,20,20,255 });
-		item_dstrect[i].x = center.x + 100;
-		item_dstrect[i].y = center.y - font_size / 2;
-	}
-	//----------
 
+	int max_items = 50;
+	int init_items = 0;
+	Sector* items = (Sector*)malloc(sizeof(Sector) * max_items);
+	for (int i = 0; i < sectorCirc; i++) {
+		int mod = i % 8;
+		items[i].color = SDL_Color({ color[mod].r,color[mod].g,color[mod].b,color[mod].a });
+		items[i].sector = i;
+		strcpy_s(items[i].str, Name_List[i]);
+		items[i].rect = SDL_Rect({ center.x + 100, center.y - font_size / 2, 0, 0 });
+		CreateTextureFromSector(ren, &items[i], font, { 120,20,20,255 });
+
+		init_items++;
+	}
+
+
+	//создание текстовых текстур секторов
+	//SDL_Texture** item_str_text = (SDL_Texture**)malloc(sizeof(SDL_Texture*) * sectorCirc);
+	//SDL_Rect* item_dstrect = (SDL_Rect*)malloc(sizeof(SDL_Rect) * sectorCirc);
+	//Создание текстуры текста
+	//for (int i = 0; i < sectorCirc; i++) {
+		//item_str_text[i] = CreateTextureFromText(ren, Name_List[i], font, &item_dstrect[i], { 120,20,20,255 });
+		//item_dstrect[i].x = center.x + 100;
+		//item_dstrect[i].y = center.y - font_size / 2;
+	//}
+	//----------
+	bool firstDraw = true;
 	double angle = 0; //угол поворота колеса
 
 	bool isRunning = true;
@@ -228,7 +479,7 @@ int main(int argc, char* argv[])
 	{
 		//Проверка сообщений
 		while (SDL_PollEvent(&ev)) { //Проверка событий	
-			//ImGui_ImplSDL2_ProcessEvent(&ev);
+			ImGui_ImplSDL2_ProcessEvent(&ev);
 			switch (ev.type)
 			{
 			case SDL_QUIT:
@@ -243,8 +494,10 @@ int main(int argc, char* argv[])
 					center.y = win_heigth / 2;
 
 					for (int i = 0; i < sectorCirc; i++) {
-						item_dstrect[i].x = center.x + 100;
-						item_dstrect[i].y = center.y - font_size / 2;
+						//item_dstrect[i].x = center.x + 100;
+						//item_dstrect[i].y = center.y - font_size / 2;
+						items[i].rect.x = center.x + 100;
+						items[i].rect.y = center.y - font_size / 2;
 					}
 				}
 				break;
@@ -292,6 +545,21 @@ int main(int argc, char* argv[])
 			}
 		}
 		
+		if (res) {
+			if (request(inCURL, req)) {
+				for (int i = 0; i < inCURL; i++) {
+					//items[i].str = "";
+					strcpy_s(items[i].str, req[i]);
+					UpdateTexturText(ren, &items[i], font, fg_str);
+				}
+				sectorCirc = inCURL;
+				isDrawTexture = true;
+			}
+			
+			res = false;
+		}
+
+
 		//вычисляем угол
 		lengSector = 360.0 / sectorCirc;
 		sectorCenter = lengSector / 2;
@@ -327,11 +595,41 @@ int main(int argc, char* argv[])
 		if (angle > 360) angle -= 360;
 		if (angle < -360) angle += 360;
 
-		SDL_Point falseCenter = { center.x - item_dstrect[0].x, 25 / 2 }; //Необходим как центр вращения для текста
-
+		SDL_Point falseCenter = { center.x - items[0].rect.x, 25 / 2 }; //Необходим как центр вращения для текста
+		
 		SDL_Rect renderPie = { center.x - radius, center.y - radius, radius * 2,radius * 2 };
 		SDL_Point centrPie = { radius, radius };
 
+		#pragma region Start ImGui Setup
+		// Start the Dear ImGui frame
+		ImGui_ImplSDLRenderer2_NewFrame();
+		ImGui_ImplSDL2_NewFrame();
+		ImGui::NewFrame();
+
+		ImGui::Begin("GlobalMenus");
+		ImGui::SetWindowPos(ImVec2(0, 0), 0);
+
+		if(ImGui::Button("request"))
+			res = true;
+
+		for (int i = 0; i < sectorCirc; i++) {
+			int mod = i % 8;
+			ImGui::PushID(i);
+
+			if(ImGui::InputText("##input_text", items[i].str, 200))
+				UpdateTexturText(ren, &items[i],font, fg_str);
+			ImGui::SameLine();
+			if(ColorEdit3U32("##color_edit", items[i].color, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel))
+				isDrawTexture = true;
+
+
+			ImGui::PopID();
+		}
+
+		ImGui::End();
+
+		ImGui::Render();
+		#pragma endregion
 		// ------------------------------------
 		// Отрисовка
 		// Очиска экрана
@@ -339,10 +637,16 @@ int main(int argc, char* argv[])
 		SDL_RenderClear(ren);
  
 #pragma region Draw_Pie
+		if (firstDraw) {
+			if (textur != NULL)	
+				SDL_DestroyTexture(textur);
+			//textur = CreatePieTexture(ren, radius, sectorCirc, color, 8, BackGround);
+
+			textur = CreatePieTextureFromSector(ren, items, sectorCirc, radius, BackGround);
+		}
 		if (isDrawTexture) {
-			if (textur != NULL)	SDL_DestroyTexture(textur);
-			textur = CreatePieTexture(ren, radius, sectorCirc, color, 8, BackGround);
-			//textur = newCreatePieTexture(ren, radius, 8, , clear_color);
+			//UpdatePieTexture(ren, textur, radius, sectorCirc, color, 8, BackGround);
+			UpdatePieTextureFromSector(ren, textur, radius, items, sectorCirc, BackGround);
 		}
 #pragma endregion		
 
@@ -355,7 +659,9 @@ int main(int argc, char* argv[])
 		SDL_SetRenderDrawColor(ren, 0, 0, 0, 255); //Чёрный цвет
 		for (int i = 0; i < sectorCirc; i++) {
 			//Центр вращения относительно координат dstrect
-			SDL_RenderCopyEx(ren, item_str_text[i], NULL, &item_dstrect[i], angle + (lengSector * (i + 1)), &falseCenter, SDL_FLIP_NONE);
+			//SDL_RenderCopyEx(ren, item_str_text[i], NULL, &item_dstrect[i], angle + (lengSector * (i + 1)), &falseCenter, SDL_FLIP_NONE);
+			SDL_RenderCopyEx(ren, items[i].texture, NULL, &items[i].rect, angle + (lengSector * (items[i].sector + 1)), &falseCenter, SDL_FLIP_NONE);
+
 		}
 
 		SDL_RenderCopy(ren, str_text, NULL, &str_rect);
@@ -364,6 +670,7 @@ int main(int argc, char* argv[])
 		filledCircleRGBA(ren, center.x, center.y, 35, 0, 0, 0, 255);
 		
 
+		ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData());
 		//Обновление картинки на экране
 		SDL_RenderPresent(ren);
 
@@ -372,13 +679,22 @@ int main(int argc, char* argv[])
 
 		//Окончание цикла
 		isDrawTexture = false;
+		firstDraw = false;
 	}
 
+	ImGui_ImplSDLRenderer2_Shutdown();
+	ImGui_ImplSDL2_Shutdown();
+	ImGui::DestroyContext();
 
 
-	for (int i = 0; i < sectorCirc; i++) {
-		SDL_DestroyTexture(item_str_text[i]);
+
+	//for (int i = 0; i < sectorCirc; i++) {
+		//SDL_DestroyTexture(item_str_text[i]);
+	//}
+	for (int i = 0; i < init_items; i++) {
+		SDL_DestroyTexture(items[i].texture);
 	}
+	free(items);
 	TTF_CloseFont(font);
 	SDL_DestroyTexture(textur);
 	SDL_DestroyTexture(str_text);
