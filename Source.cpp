@@ -1,6 +1,7 @@
 //#define _USE_MATH_DEFINES
 #include<SDL.h>
 #include<SDL_ttf.h>
+#include<SDL_mixer.h>
 #include <SDL2_gfxPrimitives.h>
 #include<iostream>
 #include<string.h>
@@ -48,6 +49,7 @@ void DeInit(int error)
 {
 	if (ren != NULL) SDL_DestroyRenderer(ren);
 	if (win != NULL) SDL_DestroyWindow(win);
+	Mix_Quit();
 	TTF_Quit();
 	SDL_Quit();
 	exit(error);
@@ -55,7 +57,7 @@ void DeInit(int error)
 
 void Init()
 {
-	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER) != 0)
+	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER | SDL_INIT_AUDIO) != 0)
 	{
 		printf("Couldn`t init SDL! Error: %s", SDL_GetError());
 		system("pause");
@@ -65,6 +67,11 @@ void Init()
 	if (TTF_Init())
 	{
 		printf("Couldn`t init SDL_TTF! Error: %s", SDL_GetError());
+		system("pause");
+		DeInit(1);
+	}
+	if (Mix_Init(MIX_INIT_OGG)==0) {
+		printf("Couldn`t init SDL_mixer! Error: %s\n", SDL_GetError());
 		system("pause");
 		DeInit(1);
 	}
@@ -368,7 +375,18 @@ int main(int argc, char* argv[])
 	//Инициализция приложения
 	Init();
 	SDL_Event ev;
+	if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
+		printf("Couldn`t open audio! Error: %s\n", SDL_GetError());
+		system("pause");
+		DeInit(1);
+	}
 
+	Mix_Music* music = Mix_LoadMUS_RW(SDL_RWFromFile(".\\music\\Dead-Or-Alive.ogg","r"), SDL_TRUE);
+	if (music == NULL) {
+		printf("Couldn`t load music! Error: %s\n", SDL_GetError());
+		system("pause");
+		DeInit(1);
+	}
 	#pragma region Initialization ImGui
 	// Setup Dear ImGui context
 	IMGUI_CHECKVERSION(); //Что делает?
@@ -485,6 +503,7 @@ int main(int argc, char* argv[])
 	bool isCoese = false;
 	bool isInCircle = false;
 	bool isRunning = true;
+	//Mix_PlayMusic(music, -1);
 	while (isRunning)
 	{
 		//Проверка сообщений
@@ -525,7 +544,9 @@ int main(int argc, char* argv[])
 				break;
 			case SDL_MOUSEBUTTONDOWN:
 				if ((ev.button.button == SDL_BUTTON_LEFT)&isInCircle) {
+					isInCircle = false;
 					isCoese = true;
+					Mix_PlayMusic(music, 0);
 				}
 				break;
 			case SDL_KEYDOWN:
@@ -596,6 +617,7 @@ int main(int argc, char* argv[])
 
 		//Алгоритм "Случайного" выбора
 		if (isCoese) {
+
 			if (choeseStep==0) {
 				dspeed = 500 / 2;
 				choeseStep++;
@@ -676,7 +698,7 @@ int main(int argc, char* argv[])
 
 			for (int i = 0; i < sectorCirc; i++) {
 				ImGui::PushID(i);
-				if (ImGui::InputText("##input_text", items[i].str, 200))
+				if (ImGui::InputText("##input_text", items[i].str, 100))
 					UpdateTexturText(ren, &items[i], font, fg_str);
 				ImGui::SameLine();
 				if (ColorEdit3U32("##color_edit", items[i].color, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel))
@@ -727,7 +749,7 @@ int main(int argc, char* argv[])
 		filledCircleRGBA(ren, center.x, center.y, small_radius, 0, 0, 0, 255);	//Маленький круг в центре	
 		filledPieRGBA(ren,center.x+radius-20,center.y,50,-20,20,0,0,0,255); //Указатель
 		SDL_RenderCopy(ren, cho_text, NULL, &cho_rect);
-		if (isInCircle)
+		if (isInCircle|isCoese)
 			DrawCircle(ren, 70, small_radius, center, 3, { 0,240,0,255 });
 
 		ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData());
@@ -751,6 +773,7 @@ int main(int argc, char* argv[])
 	//for (int i = 0; i < sectorCirc; i++) {
 		//SDL_DestroyTexture(item_str_text[i]);
 	//}
+	Mix_FreeMusic(music);
 	for (int i = 0; i < init_items; i++) {
 		SDL_DestroyTexture(items[i].texture);
 	}
