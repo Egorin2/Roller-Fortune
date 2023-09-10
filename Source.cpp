@@ -5,6 +5,7 @@
 #include <SDL2_gfxPrimitives.h>
 #include<iostream>
 #include<string.h>
+#include<thread>
 
 #include <string>
 #include <curl/curl.h>
@@ -24,7 +25,7 @@ const float radius = 400; //Радиус пирога
 int sectorCirc = maxSectors; //Количество секторов
 double speed = 0; //"Угловая" скорость
 
-const char* Name_List[50] = { "Welcum to hell!", "Item 2", "Item 3", u8"Пошёл нахер, козёл!", u8"Гнида", u8"Петух", u8"The FUCK!!!", u8"УМРУ, НО НЕ СДАМСЯ!", "Item 9", "Item 10","Item 11", "Item 12","Item 13", "Item 14" ,"Item 15", "Item 16" ,"Item 17", "Item 18" ,"Item 19", "Item 20", "Item 21", "Item 22", "Item 23","Item 24", "Item 25","Item 26", "Item 27" ,"Item 28", "Item 29" ,"Item 30", "Item 31" };
+const char* Name_List[50] = { "Welcum to hell!", "Item2", "Item3", u8"Чем дальше", u8"Тем будет хуже", u8"Петух", u8"Item 7", "Item8", "Item 9", u8"Как видите","Item 11", u8"Здесь я уже схожу с ума","Item 13", "Item 14", u8"Эта штука продолжает не работать", "Item 16" ,u8"УМРУ, НО НЕ СДАМСЯ!", "Item 18" ,u8"пююююююю", "Item 20", "Item 21", "Item 22", "Item 23","Item 24", "Item 25","Item 26", "Item 27" ,"Item 28", "Item 29" ,"Item 30", "Item 31" };
 
 
 SDL_Color BackGround;
@@ -248,8 +249,11 @@ void CreateTextureFromSector(SDL_Renderer* render, Sector* sector, TTF_Font* fon
 	SDL_FreeSurface(surface);
 }
 void UpdateTexturText(SDL_Renderer* render, Sector* sector, TTF_Font* font, SDL_Color fg) {
-	SDL_DestroyTexture(sector->texture);
-	if (sector->str == u8"") {
+	if (sector->texture != NULL) {
+		SDL_DestroyTexture(sector->texture);
+		sector->texture = NULL;
+	}
+	if (sector->str == "\0") {
 		return;
 	}
 	SDL_Surface* surface = TTF_RenderUTF8_Blended(font, sector->str, fg);
@@ -370,8 +374,11 @@ void CopyBuffer(std::string buffer, Sector* items, int &count) {
 	}
 }
 
+std::thread t1;
+
 int main(int argc, char* argv[])
 {
+	
 	//Инициализция приложения
 	Init();
 	SDL_Event ev;
@@ -419,7 +426,7 @@ int main(int argc, char* argv[])
 	//инициализация шрифта
 	int font_size = 25;
 	TTF_Font* font = TTF_OpenFont("./fonts/Candara.ttf", font_size);
-
+	TTF_Font* font_for_choes = TTF_OpenFont("./fonts/Candara.ttf", font_size*2);
 
 	char str[100] = u8"This program is not work! It is a bad job! Плохая программа!";
 	SDL_Rect str_rect;
@@ -495,6 +502,17 @@ int main(int argc, char* argv[])
 	SDL_Rect cho_rect = {0,0,0,0};
 	int small_radius = 35;
 
+	bool isPlayMusic = false;
+
+	bool endTread = false;
+
+	bool globalItem = false;
+	bool endChoes = false;
+	char end_str[100] = u8"выбор колеса пришёлся на";
+	SDL_Rect end_rect = {100,100,0,0};
+	SDL_Texture* end_str_text = CreateTextureFromText(ren, end_str, font_for_choes, &end_rect, { 255,255,255,255 });
+	SDL_Texture* choes_text = NULL;
+	SDL_Rect choes_rect = {100,125,0,0};
 
 	float second = 0;
 	int choeseStep = 0;
@@ -504,6 +522,7 @@ int main(int argc, char* argv[])
 	bool isInCircle = false;
 	bool isRunning = true;
 	//Mix_PlayMusic(music, -1);
+	
 	while (isRunning)
 	{
 		//Проверка сообщений
@@ -546,7 +565,7 @@ int main(int argc, char* argv[])
 				if ((ev.button.button == SDL_BUTTON_LEFT)&isInCircle) {
 					isInCircle = false;
 					isCoese = true;
-					Mix_PlayMusic(music, 0);
+					//Mix_PlayMusic(music, 0);
 				}
 				break;
 			case SDL_KEYDOWN:
@@ -554,22 +573,29 @@ int main(int argc, char* argv[])
 				{
 				case SDL_SCANCODE_UP:					
 					speed += 15;
+					if (!isPlayMusic) {
+						isPlayMusic = true;
+						Mix_PlayMusic(music, -1);
+					}
 					
-					//dspeed = speed / 5 * (-1);
-					//stop = true;
 					break;
 				case SDL_SCANCODE_DOWN:
 					speed -= 15;
-					
-					//stop = false;
-					//dspeed = 5000 / 6;
+					if (!isPlayMusic) {
+						isPlayMusic = true;
+						Mix_PlayMusic(music, -1);
+					}
 					break;
 				case SDL_SCANCODE_SPACE:
 					if (speed != 0) {
 						speed = 0;
+						isPlayMusic = false;
+						Mix_PauseMusic();
 					}
 					else {
 						speed = 50;
+						//Mix_PlayMusic(music, -1);
+						isPlayMusic = true;
 					}
 					break;
 				case SDL_SCANCODE_KP_PLUS:
@@ -585,6 +611,8 @@ int main(int argc, char* argv[])
 					}
 					break;
 				default:
+					if (globalItem)
+						globalItem = false;
 					break;
 				}
 				break;
@@ -592,6 +620,19 @@ int main(int argc, char* argv[])
 		}
 		
 		if (res) {
+			
+			std::thread t1([&]()
+				{
+					if (request(&curlBuffer)) {
+						CopyBuffer(curlBuffer, items, inCURL);						
+						sectorCirc = inCURL;
+						//isDrawTexture = true;
+						curlBuffer = "";
+						endTread = true;
+					}
+				});
+			t1.detach();
+			/*
 			if (request(&curlBuffer)) {
 				CopyBuffer(curlBuffer, items, inCURL);
 				for (int i = 0; i < sectorCirc; i++) {
@@ -600,10 +641,17 @@ int main(int argc, char* argv[])
 				sectorCirc = inCURL;
 				isDrawTexture = true;
 				curlBuffer = "";
-			}			
+			}*/			
 			res = false;
 		}
 
+		if (endTread) {
+			for (int i = 0; i < sectorCirc; i++) {
+				UpdateTexturText(ren, &items[i], font, fg_str);
+			}
+			isDrawTexture = true;
+			endTread = false;
+		}
 
 		//вычисляем угол
 		lengSector = 360.0 / sectorCirc;
@@ -619,7 +667,8 @@ int main(int argc, char* argv[])
 		if (isCoese) {
 
 			if (choeseStep==0) {
-				dspeed = 500 / 2;
+				Mix_FadeInMusic(music, 0, 2000);
+				dspeed = 700 / 2;
 				choeseStep++;
 			}
 			if ((choeseStep == 1)&(second>2)) {
@@ -627,7 +676,7 @@ int main(int argc, char* argv[])
 				choeseStep++;
 			}
 			if ((choeseStep == 2)& (second > 7)) {
-				dspeed = -1*speed/3;
+				dspeed = -1*speed/4;
 				choeseStep++;
 			}
 			if ((choeseStep == 3) & ((speed + dspeed/1000*dt)<=0)) {
@@ -636,10 +685,15 @@ int main(int argc, char* argv[])
 				isCoese = false;
 				choeseStep = 0;
 				second = 0;
+				endChoes = true;
 			}
+			if (second > 9)
+				Mix_FadeOutMusic(2000);;
 			second += ((float)dt) / 1000;
 		}
 
+
+		
 		/*
 		if (speed > 5000 & !stop) {
 			dspeed = 0;
@@ -682,13 +736,18 @@ int main(int argc, char* argv[])
 		cho_rect.x = center.x - 10;
 		cho_rect.y = center.y - font_size / 2;
 
+		if (endChoes) {
+			choes_text = CreateTextureFromText(ren, items[choese_item - 1].str, font_for_choes, &choes_rect, { 255,255,255,255 });
+			endChoes = false;
+			globalItem = true;
+		}
 
 		#pragma region Start ImGui Setup
 		// Start the Dear ImGui frame
 		ImGui_ImplSDLRenderer2_NewFrame();
 		ImGui_ImplSDL2_NewFrame();
 		ImGui::NewFrame();
-		if (!isCoese) {
+		if (!isCoese&!globalItem) {
 			ImGui::SetNextWindowPos(ImVec2(0, 0), 0);
 			ImGui::SetNextWindowSize(ImVec2(300, win_heigth));
 			ImGui::Begin("GlobalMenus", 0, window_flags);
@@ -739,7 +798,8 @@ int main(int argc, char* argv[])
 		for (int i = 0; i < sectorCirc; i++) {
 			//Центр вращения относительно координат dstrect
 			//SDL_RenderCopyEx(ren, item_str_text[i], NULL, &item_dstrect[i], angle + (lengSector * (i + 1)), &falseCenter, SDL_FLIP_NONE);
-			SDL_RenderCopyEx(ren, items[i].texture, NULL, &items[i].rect, angle + (lengSector * (items[i].sector + 1)), &falseCenter, SDL_FLIP_NONE);
+			if(items[i].texture != NULL)
+				SDL_RenderCopyEx(ren, items[i].texture, NULL, &items[i].rect, angle + (lengSector * (items[i].sector + 1)), &falseCenter, SDL_FLIP_NONE);
 
 		}
 		//Текст "плохпя программа"
@@ -752,6 +812,20 @@ int main(int argc, char* argv[])
 		if (isInCircle|isCoese)
 			DrawCircle(ren, 70, small_radius, center, 3, { 0,240,0,255 });
 
+		if (globalItem) {
+			SDL_SetRenderDrawColor(ren,100,100,100,255);
+			end_rect.x = center.x - end_rect.w /2;
+			end_rect.y = center.y - (radius / 2)+10;
+			choes_rect.x = end_rect.x;
+			choes_rect.y = end_rect.y + end_rect.h;
+			SDL_Rect gl = { end_rect.x - 10, end_rect.y - 10 , end_rect.w+20, end_rect.h + choes_rect.h+20 };
+			SDL_RenderFillRect(ren,&gl);
+			SDL_SetRenderDrawColor(ren, 0, 0, 0, 255);
+			SDL_RenderDrawRect(ren, &gl);
+			SDL_RenderCopy(ren,end_str_text,NULL,&end_rect);
+			SDL_RenderCopy(ren, choes_text, NULL, &choes_rect);
+		}
+
 		ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData());
 		//Обновление картинки на экране
 		SDL_RenderPresent(ren);
@@ -762,6 +836,7 @@ int main(int argc, char* argv[])
 		//Окончание цикла
 		isDrawTexture = false;
 		firstDraw = false;
+		
 	}
 
 	ImGui_ImplSDLRenderer2_Shutdown();
@@ -777,6 +852,9 @@ int main(int argc, char* argv[])
 	for (int i = 0; i < init_items; i++) {
 		SDL_DestroyTexture(items[i].texture);
 	}
+	if(choes_text != NULL)
+		SDL_DestroyTexture(choes_text);
+	SDL_DestroyTexture(end_str_text);
 	free(items);
 	TTF_CloseFont(font);
 	SDL_DestroyTexture(textur);
