@@ -385,7 +385,7 @@ int main(int argc, char* argv[])
 	ImGui_ImplSDLRenderer2_Init(ren);
 
 	io.Fonts->Clear();//Переписать адрес шрифта
-	ImFont* fontForGui = io.Fonts->AddFontFromFileTTF("F:\\ProgramProject\\Roller Fortune\\Debug\\fonts\\Candara.ttf", 18.0f, nullptr, io.Fonts->GetGlyphRangesCyrillic());
+	ImFont* fontForGui = io.Fonts->AddFontFromFileTTF(".\\fonts\\Candara.ttf", 18.0f, nullptr, io.Fonts->GetGlyphRangesCyrillic());
 	IM_ASSERT(fontForGui != nullptr);
 	#pragma endregion
 	ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove;
