@@ -1,4 +1,4 @@
-#define _USE_MATH_DEFINES
+//#define _USE_MATH_DEFINES
 #include<SDL.h>
 #include<SDL_ttf.h>
 #include <SDL2_gfxPrimitives.h>
@@ -21,7 +21,7 @@ const int maxSectors = 25;
 
 const float radius = 400; //Радиус пирога
 int sectorCirc = maxSectors; //Количество секторов
-double speed = 50; //"Угловая" скорость
+double speed = 0; //"Угловая" скорость
 
 const char* Name_List[50] = { "Welcum to hell!", "Item 2", "Item 3", u8"Пошёл нахер, козёл!", u8"Гнида", u8"Петух", u8"The FUCK!!!", u8"УМРУ, НО НЕ СДАМСЯ!", "Item 9", "Item 10","Item 11", "Item 12","Item 13", "Item 14" ,"Item 15", "Item 16" ,"Item 17", "Item 18" ,"Item 19", "Item 20", "Item 21", "Item 22", "Item 23","Item 24", "Item 25","Item 26", "Item 27" ,"Item 28", "Item 29" ,"Item 30", "Item 31" };
 
@@ -105,7 +105,7 @@ void mathCordsToScrean(double x, double y, double scale, int centerX, int center
 
 
 //Для рисование основной текстуры
-void DrawCircle(SDL_Renderer* render, int point_count, double radius, SDL_Point center, Uint8 width) {
+void DrawCircle(SDL_Renderer* render, int point_count, double radius, SDL_Point center, Uint8 width, SDL_Color color) {
 
 	SDL_Point* points = (SDL_Point*)malloc(sizeof(SDL_Point) * (point_count + 1));
 	double alphas = 0;
@@ -116,7 +116,7 @@ void DrawCircle(SDL_Renderer* render, int point_count, double radius, SDL_Point 
 	}
 	points[point_count] = points[0];
 	for (int i = 0; i < point_count; i++) {
-		thickLineRGBA(render, points[i].x, points[i].y, points[i + 1].x, points[i + 1].y, width, 0, 0, 0, 255);
+		thickLineRGBA(render, points[i].x, points[i].y, points[i + 1].x, points[i + 1].y, width, color.r, color.g, color.b, color.a);
 	}
 	free(points);
 }
@@ -136,10 +136,10 @@ void DrawPie(SDL_Renderer* render, int radius, int sector, SDL_Color* color, int
 		mathCordsToScrean(x, y, 1.0, center.x, center.y, sx, sy);
 		//SDL_RenderDrawLine(ren, center.x, center.y, sx, sy);
 
-		thickLineRGBA(render, center.x, center.y, sx, sy, 3, 0, 0, 0, 255);
+		//thickLineRGBA(render, center.x, center.y, sx, sy, 3, 0, 0, 0, 255);
 		thickLineRGBA(render, center.x, center.y, center.x + x, center.y - y, 3, 0, 0, 0, 255);
 	}
-	DrawCircle(render, 70, radius, center, 3);
+	DrawCircle(render, 70, radius, center, 3, {0,0,0,255});
 }
 void DrawPieFromSector(SDL_Renderer* render, Sector* items, int count, int radius, SDL_Point center) {
 	double lengSector = 360.0 / count;
@@ -157,7 +157,7 @@ void DrawPieFromSector(SDL_Renderer* render, Sector* items, int count, int radiu
 		//thickLineRGBA(render, center.x, center.y, sx, sy, 3, 0, 0, 0, 255);
 		thickLineRGBA(render, center.x, center.y, center.x + x, center.y - y, 3, 0, 0, 0, 255);
 	}
-	DrawCircle(render, 70, radius, center, 3);
+	DrawCircle(render, 70, radius, center, 3, {0,0,0,255});
 }
 //Основная текстура
 SDL_Texture* CreatePieTexture(SDL_Renderer* render, int radius, int sector, SDL_Color* color, int countColor, SDL_Color bg) {
@@ -388,7 +388,7 @@ int main(int argc, char* argv[])
 	ImFont* fontForGui = io.Fonts->AddFontFromFileTTF("F:\\ProgramProject\\Roller Fortune\\Debug\\fonts\\Candara.ttf", 18.0f, nullptr, io.Fonts->GetGlyphRangesCyrillic());
 	IM_ASSERT(fontForGui != nullptr);
 	#pragma endregion
-
+	ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove;
 
 	//Назначаем цвет фона
 	BackGround = { 200, 200, 200,255 };
@@ -470,7 +470,20 @@ int main(int argc, char* argv[])
 	//----------
 	bool firstDraw = true;
 	double angle = 0; //угол поворота колеса
+	int choese = 0;
+	int choese_item = 0;
+	char choese_str[10];
+	SDL_Texture* cho_text = NULL;
+	SDL_Rect cho_rect = {0,0,0,0};
+	int small_radius = 35;
 
+
+	float second = 0;
+	int choeseStep = 0;
+	int mouse_pos_x = 0;
+	int mouse_pos_y = 0;
+	bool isCoese = false;
+	bool isInCircle = false;
 	bool isRunning = true;
 	while (isRunning)
 	{
@@ -498,30 +511,35 @@ int main(int argc, char* argv[])
 					}
 				}
 				break;
-			case SDL_MOUSEBUTTONDOWN:
-				if (ev.button.button == SDL_BUTTON_LEFT) {
-					speed += 15;
+			case SDL_MOUSEMOTION:
+				if (!isCoese) {
+					mouse_pos_x = ev.motion.x - center.x;
+					mouse_pos_y = ev.motion.y - center.y;
+					if (sqrt(mouse_pos_x * mouse_pos_x + mouse_pos_y * mouse_pos_y) < small_radius) {
+						isInCircle = true;
+					}
+					else {
+						isInCircle = false;
+					}
 				}
-				if (ev.button.button == SDL_BUTTON_RIGHT) {
-					speed -= 15;
+				break;
+			case SDL_MOUSEBUTTONDOWN:
+				if ((ev.button.button == SDL_BUTTON_LEFT)&isInCircle) {
+					isCoese = true;
 				}
 				break;
 			case SDL_KEYDOWN:
 				switch (ev.key.keysym.scancode)
 				{
-				case SDL_SCANCODE_LEFT:
-					if (sectorCirc < maxSectors) {
-						sectorCirc++;
-						isDrawTexture = true;
-					}
+				case SDL_SCANCODE_UP:					
+					speed += 15;
+					
 					//dspeed = speed / 5 * (-1);
 					//stop = true;
 					break;
-				case SDL_SCANCODE_RIGHT:
-					if (sectorCirc > 2) {
-						sectorCirc--;
-						isDrawTexture = true;
-					}
+				case SDL_SCANCODE_DOWN:
+					speed -= 15;
+					
 					//stop = false;
 					//dspeed = 5000 / 6;
 					break;
@@ -532,12 +550,22 @@ int main(int argc, char* argv[])
 					else {
 						speed = 50;
 					}
+					break;
+				case SDL_SCANCODE_KP_PLUS:
+					if (sectorCirc < maxSectors) {
+						sectorCirc++;
+						isDrawTexture = true;
+					}
+					break;
+				case SDL_SCANCODE_KP_MINUS:
+					if (sectorCirc > 2) {
+						sectorCirc--;
+						isDrawTexture = true;
+					}
+					break;
 				default:
 					break;
 				}
-				break;
-
-			default:
 				break;
 			}
 		}
@@ -566,7 +594,29 @@ int main(int argc, char* argv[])
 		dt = newtick - lasttick;
 		lasttick = newtick;
 
-
+		//Алгоритм "Случайного" выбора
+		if (isCoese) {
+			if (choeseStep==0) {
+				dspeed = 500 / 2;
+				choeseStep++;
+			}
+			if ((choeseStep == 1)&(second>2)) {
+				dspeed = 0;
+				choeseStep++;
+			}
+			if ((choeseStep == 2)& (second > 7)) {
+				dspeed = -1*speed/3;
+				choeseStep++;
+			}
+			if ((choeseStep == 3) & ((speed + dspeed/1000*dt)<=0)) {
+				speed = 0;
+				dspeed = 0;
+				isCoese = false;
+				choeseStep = 0;
+				second = 0;
+			}
+			second += ((float)dt) / 1000;
+		}
 
 		/*
 		if (speed > 5000 & !stop) {
@@ -584,9 +634,6 @@ int main(int argc, char* argv[])
 		speed += dspeed / 1000 * dt;
 
 
-
-
-
 		angle = angle + (speed / 1000) * dt;
 		if (angle > 360) angle -= 360;
 		if (angle < -360) angle += 360;
@@ -596,34 +643,48 @@ int main(int argc, char* argv[])
 		SDL_Rect renderPie = { center.x - radius, center.y - radius, radius * 2,radius * 2 };
 		SDL_Point centrPie = { radius, radius };
 
+		//Расчёт положения указателя
+		choese = (int)floor((angle+sectorCenter) / lengSector);
+		if (choese >= 0) {
+			for (choese; choese > sectorCirc; choese - sectorCirc);
+			choese_item = sectorCirc - choese;
+			if (choese_item == 0)
+				choese_item = sectorCirc;
+		}
+		if (choese < 0)
+			choese_item = choese * -1;
+		//Создание текстуры указателя
+		sprintf_s(choese_str, "%02i", choese_item);
+		if (cho_text != NULL) SDL_DestroyTexture(cho_text);
+		cho_text = CreateTextureFromText(ren, choese_str, font, &cho_rect, { 255,255,255,255 });
+		cho_rect.x = center.x - 10;
+		cho_rect.y = center.y - font_size / 2;
+
+
 		#pragma region Start ImGui Setup
 		// Start the Dear ImGui frame
 		ImGui_ImplSDLRenderer2_NewFrame();
 		ImGui_ImplSDL2_NewFrame();
 		ImGui::NewFrame();
+		if (!isCoese) {
+			ImGui::SetNextWindowPos(ImVec2(0, 0), 0);
+			ImGui::SetNextWindowSize(ImVec2(300, win_heigth));
+			ImGui::Begin("GlobalMenus", 0, window_flags);
 
-		ImGui::Begin("GlobalMenus");
-		ImGui::SetWindowPos(ImVec2(0, 0), 0);
+			if (ImGui::Button(u8"Запрос в БД"))
+				res = true;
 
-		if(ImGui::Button("request"))
-			res = true;
-
-		for (int i = 0; i < sectorCirc; i++) {
-			int mod = i % 8;
-			ImGui::PushID(i);
-
-			if(ImGui::InputText("##input_text", items[i].str, 200))
-				UpdateTexturText(ren, &items[i],font, fg_str);
-			ImGui::SameLine();
-			if(ColorEdit3U32("##color_edit", items[i].color, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel))
-				isDrawTexture = true;
-
-
-			ImGui::PopID();
+			for (int i = 0; i < sectorCirc; i++) {
+				ImGui::PushID(i);
+				if (ImGui::InputText("##input_text", items[i].str, 200))
+					UpdateTexturText(ren, &items[i], font, fg_str);
+				ImGui::SameLine();
+				if (ColorEdit3U32("##color_edit", items[i].color, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel))
+					isDrawTexture = true;
+				ImGui::PopID();
+			}
+			ImGui::End();
 		}
-
-		ImGui::End();
-
 		ImGui::Render();
 		#pragma endregion
 		// ------------------------------------
@@ -659,12 +720,15 @@ int main(int argc, char* argv[])
 			SDL_RenderCopyEx(ren, items[i].texture, NULL, &items[i].rect, angle + (lengSector * (items[i].sector + 1)), &falseCenter, SDL_FLIP_NONE);
 
 		}
-
-		SDL_RenderCopy(ren, str_text, NULL, &str_rect);
+		//Текст "плохпя программа"
+		//SDL_RenderCopy(ren, str_text, NULL, &str_rect);
 
 		//Рисование остальных элементов
-		filledCircleRGBA(ren, center.x, center.y, 35, 0, 0, 0, 255);
-		
+		filledCircleRGBA(ren, center.x, center.y, small_radius, 0, 0, 0, 255);	//Маленький круг в центре	
+		filledPieRGBA(ren,center.x+radius-20,center.y,50,-20,20,0,0,0,255); //Указатель
+		SDL_RenderCopy(ren, cho_text, NULL, &cho_rect);
+		if (isInCircle)
+			DrawCircle(ren, 70, small_radius, center, 3, { 0,240,0,255 });
 
 		ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData());
 		//Обновление картинки на экране
