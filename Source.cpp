@@ -113,6 +113,108 @@ void mathCordsToScrean(double x, double y, double scale, int centerX, int center
 
 
 //Для рисование основной текстуры
+int pieRGBA_fix(SDL_Renderer* renderer, Sint16 x, Sint16 y, Sint16 rad, double start, double end, Uint8 r, Uint8 g, Uint8 b, Uint8 a, Uint8 filled)
+{
+	int result;
+	double angle, start_angle, end_angle;
+	double deltaAngle;
+	double dr;
+	int numpoints, i;
+	Sint16* vx, * vy;
+
+	/*
+	* Sanity check radii
+	*/
+	if (rad < 0) {
+		return (-1);
+	}
+
+	/*
+	* Fixup angles
+	*/
+	//start = start % 360;
+	//end = end % 360;
+
+	/*
+	* Special case for rad=0 - draw a point
+	*/
+	if (rad == 0) {
+		return (pixelRGBA(renderer, x, y, r, g, b, a));
+	}
+
+	/*
+	* Variable setup
+	*/
+	dr = (double)rad;
+	deltaAngle = 3.0 / dr;
+	start_angle = (double)start * (2.0 * M_PI / 360.0);
+	end_angle = (double)end * (2.0 * M_PI / 360.0);
+	if (start > end) {
+		end_angle += (2.0 * M_PI);
+	}
+
+	/* We will always have at least 2 points */
+	numpoints = 2;
+
+	/* Count points (rather than calculating it) */
+	angle = start_angle;
+	while (angle < end_angle) {
+		angle += deltaAngle;
+		numpoints++;
+	}
+
+	/* Allocate combined vertex array */
+	vx = vy = (Sint16*)malloc(2 * sizeof(Uint16) * numpoints);
+	if (vx == NULL) {
+		return (-1);
+	}
+
+	/* Update point to start of vy */
+	vy += numpoints;
+
+	/* Center */
+	vx[0] = x;
+	vy[0] = y;
+
+	/* First vertex */
+	angle = start_angle;
+	vx[1] = x + (int)(dr * cos(angle));
+	vy[1] = y + (int)(dr * sin(angle));
+
+	if (numpoints < 3)
+	{
+		result = lineRGBA(renderer, vx[0], vy[0], vx[1], vy[1], r, g, b, a);
+	}
+	else
+	{
+		/* Calculate other vertices */
+		i = 2;
+		angle = start_angle;
+		while (angle < end_angle) {
+			angle += deltaAngle;
+			if (angle > end_angle)
+			{
+				angle = end_angle;
+			}
+			vx[i] = x + (int)(dr * cos(angle));
+			vy[i] = y + (int)(dr * sin(angle));
+			i++;
+		}
+
+		/* Draw */
+		if (filled) {
+			result = filledPolygonRGBA(renderer, vx, vy, numpoints, r, g, b, a);
+		}
+		else {
+			result = polygonRGBA(renderer, vx, vy, numpoints, r, g, b, a);
+		}
+	}
+
+	/* Free combined vertex array */
+	free(vx);
+
+	return (result);
+}
 void DrawCircle(SDL_Renderer* render, int point_count, double radius, SDL_Point center, Uint8 width, SDL_Color color) {
 
 	SDL_Point* points = (SDL_Point*)malloc(sizeof(SDL_Point) * (point_count + 1));
@@ -134,7 +236,8 @@ void DrawPie(SDL_Renderer* render, int radius, int sector, SDL_Color* color, int
 	double lengSector = 360.0 / sector;
 	for (int i = 0; i < sector; i++) {
 		int mod = i % countColor;
-		filledPieRGBA(render, center.x, center.y, radius, lengSector * i, lengSector * (i + 1), color[mod].r, color[mod].g, color[mod].b, color[mod].a);
+		//filledPieRGBA(render, center.x, center.y, radius, lengSector * i, lengSector * (i + 1), color[mod].r, color[mod].g, color[mod].b, color[mod].a);
+		pieRGBA_fix(render, center.x, center.y, radius, lengSector * i, lengSector * (i + 1), color[mod].r, color[mod].g, color[mod].b, color[mod].a, 1);
 	}
 	for (int i = 0; i < sector; i++) {
 		int sx, sy;
@@ -152,7 +255,8 @@ void DrawPie(SDL_Renderer* render, int radius, int sector, SDL_Color* color, int
 void DrawPieFromSector(SDL_Renderer* render, Sector* items, int count, int radius, SDL_Point center) {
 	double lengSector = 360.0 / count;
 	for (int i = 0; i < count; i++) {
-		filledPieRGBA(render, center.x, center.y, radius, lengSector * i, lengSector * (i + 1), items[i].color.r, items[i].color.g, items[i].color.b, items[i].color.a);
+		//filledPieRGBA(render, center.x, center.y, radius, lengSector * i, lengSector * (i + 1), items[i].color.r, items[i].color.g, items[i].color.b, items[i].color.a);
+		pieRGBA_fix(render, center.x, center.y, radius, lengSector * i, lengSector * (i + 1), items[i].color.r, items[i].color.g, items[i].color.b, items[i].color.a, 1);
 	}
 	for (int i = 0; i < count; i++) {
 		int sx, sy;
